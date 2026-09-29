@@ -35,9 +35,26 @@
         <div style="margin-bottom:24px;">
           <div style="font-size:18px;font-weight:700;margin-bottom:6px;">导入 / 备份数据</div>
           <div style="font-size:12px;color:var(--dim);line-height:1.8;">
-            支持导入旧版记录和本网站的 JSON 备份。<br>
-            按照下方步骤操作，无需 Console，直接粘贴即可。
+            导入错题 CSV，建立随时可以重练的复习章节；也支持旧版记录和 JSON 备份。
           </div>
+        </div>
+
+        <div class="csv-import-panel">
+          <h2>导入错题 CSV</h2>
+          <p class="muted">选择从「错词本」或听写结果页导出的 CSV。可新建复习章节，也可合并到已有复习章节；同一原章节的相同词条自动去重。</p>
+          <label for="csv-file">错题文件</label>
+          <input id="csv-file" type="file" accept=".csv,text/csv">
+          <label for="csv-target">导入到</label>
+          <select id="csv-target" onchange="document.getElementById('csv-name-field').hidden=!!this.value">
+            <option value="">新建复习章节</option>
+          </select>
+          <div id="csv-name-field">
+            <label for="csv-name">章节名称</label>
+            <input id="csv-name" type="text" maxlength="100" placeholder="例如：本周错题（留空使用文件名）">
+          </div>
+          <p class="muted">导入后使用逐词朗读，重新填写答案并批改。章节保存在当前浏览器，也会包含在完整备份中。</p>
+          <button id="csv-import-btn" class="btn btn-primary" onclick="importWrongCsv()">导入错题</button>
+          <div id="csv-result" role="status" aria-live="polite"></div>
         </div>
 
         <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;">
@@ -119,7 +136,7 @@
             <label>播放方式 <select id="audio-mode" onchange="changeAudioMode()"><option value="chapter">教材录音</option><option value="speech">逐词朗读</option><option value="local">本地音频</option></select></label>
             <select id="audio-track" aria-label="选择教材录音" onchange="loadTrack()"></select>
             <label id="local-audio-label" hidden>选择音频 <input id="local-audio" type="file" accept="audio/*" onchange="loadLocalAudio(this)"></label>
-            <label>速度 <select id="audio-rate" onchange="updateAudioRate()"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option></select></label>
+            <label>速度 <select id="audio-rate" onchange="updateAudioRate()"><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.4">1.4×</option><option value="1.5">1.5×</option><option value="1.6">1.6×</option></select></label>
           </div>
           <div id="recording-controls" class="audio-toolbar"><button class="btn btn-ghost btn-sm" onclick="seekAudio(-5)">↶ 5 秒</button><audio id="chapter-audio" controls preload="none"></audio><button class="btn btn-ghost btn-sm" onclick="seekAudio(5)">5 秒 ↷</button></div>
           <div id="speech-controls" class="audio-toolbar" hidden>
@@ -163,6 +180,7 @@
           </div>
           <button class="btn btn-ghost btn-sm" onclick="practiceWb()">只听错题</button>
           <button class="btn btn-ghost btn-sm" onclick="exportWb()">导出 CSV</button>
+          <button class="btn btn-ghost btn-sm" onclick="toImport()">导入错题 CSV</button>
           <label class="muted"><input type="checkbox" id="wb-mastered" onchange="renderWb()"> 包含已掌握</label>
         </div>
         <div id="wb-body"></div>

@@ -75,7 +75,12 @@ function toHome(){showScreen('home');renderHome();activateTab('home');}
 function toWb(){renderWb();showScreen('wb');activateTab('wb');}
 
 // ── HOME ──
-const GROUPS=Array.from({length:10},(_,i)=>[ `第 ${i+2} 章`,k=>k.startsWith((i+2)+'.')]);
+const GROUPS=[...Array.from({length:10},(_,i)=>[ `第 ${i+2} 章`,k=>k.startsWith((i+2)+'.')]),['自定义复习',k=>k.startsWith('custom-')]];
+function chapterLabel(chap){return CHAPTERS[chap]?.custom?CHAPTERS[chap].title:`章节 ${chap}`;}
+function chapterWrongWords(chap){
+  const keys=CHAPTERS[chap]?.custom?new Set((VOCAB[chap]||[]).map(wordKey)):null;
+  return Object.values(getWb()).filter(w=>!w.mastered&&(keys?keys.has(wordKey(w)):w.chap===chap));
+}
 
 function renderHome(){
   qs('.home-hero p').textContent=`${Object.keys(VOCAB).length} 个练习 · ${Object.values(VOCAB).reduce((n,w)=>n+w.length,0)} 条语料 · 点击章节开始听写`;
@@ -96,7 +101,7 @@ function renderHome(){
 
       const sparkId=`spark-${ch.replace(/\./g,'-')}`;
       html+=`<div class="card" onclick="openStats('${ch}')">
-        <div class="card-name">${ch}</div>
+        <div class="card-name">${CHAPTERS[ch]?.custom?'自定义复习':ch}</div>
         <div class="card-title">${escapeHtml(CHAPTERS[ch]?.title||ch)}</div>
         <div class="card-cnt">${cnt} 词 · ${sessions.length ? sessions.length+'次' : '未练'}</div>
         ${badge}
@@ -172,10 +177,10 @@ function drawSparkline(canvasId,data){
 // ── STATS SCREEN ──
 function openStats(chap){
   const sessions=chapSessions(chap);
-  qs('#st-title').textContent=`章节 ${chap}`;
+  qs('#st-title').textContent=chapterLabel(chap);
   qs('#st-subtitle').textContent=`共 ${VOCAB[chap].length} 个单词 · 已练 ${sessions.length} 次`;
   qs('#st-start-btn').onclick=()=>startDict(chap);
-  const wrong=Object.values(getWb()).filter(w=>w.chap===chap&&!w.mastered);
+  const wrong=chapterWrongWords(chap);
   qs('#st-wrong-btn').textContent=`只听本章错题 (${wrong.length})`;
   qs('#st-wrong-btn').disabled=!wrong.length;
   qs('#st-wrong-btn').onclick=()=>practiceChapWb(chap);
@@ -308,11 +313,11 @@ function startDict(chap,words,restore=null){
   stopPlayback();saveDraft();
   curChap=chap;wbMode=!!words;submitted=false;grades=null;activeWord=0;
   sessionId=restore?.sessionId||Date.now()+'-'+Math.random().toString(36).slice(2);
-  curWords=(words||VOCAB[chap]||[]).map(w=>({...w,chap:w.chap||chap||'未知章节'}));
+  curWords=(restore?.words||words||VOCAB[chap]||[]).map(w=>({...w,chap:w.chap||chap||'未知章节'}));
   if(!curWords.length){notify('没有可听写的词条。');return;}
   if(wbMode&&!restore)curWords=shuffle(curWords);
   lastPractice=curWords.map(w=>({...w}));
-  qs('#d-chap').textContent=wbMode?'只听错题':`章节 ${chap}`;
+  qs('#d-chap').textContent=wbMode?'只听错题':chapterLabel(chap);
   qs('#d-meta').textContent=`第 ${chapSessions(chap||'__wb__').length+1} 次 · ${fmtDateFull(new Date())}`;
   qs('#d-footer-info').textContent='Enter 下一格 · Alt + P 播放/暂停 · Alt + R 重听 · 完成后自动批改';
   qs('#btn-finish').disabled=false;qs('#btn-check').disabled=false;
@@ -431,7 +436,7 @@ function showResults(pct,correct,total,wrongWords){
 
   qs('#r-meta').textContent=wbMode
     ?`错词练习 · ${today}`
-    :`章节 ${curChap} · 第 ${sessionNum} 次 · ${today}`;
+    :`${chapterLabel(curChap)} · 第 ${sessionNum} 次 · ${today}`;
   qs('#r-pct').textContent=pct+'%';
   qs('#r-pct').className='res-pct '+cls;
   qs('#r-sub').textContent=`正确 ${correct} / ${total}`;
@@ -485,7 +490,7 @@ function renderWb(){
 
   // group by chapter, preserving chapter order
   const chapOrder=Object.keys(VOCAB);
-  const groups={};
+  const groups=Object.create(null);
   items.forEach(w=>{
     const ch=w.chap||'未知章节';
     if(!groups[ch])groups[ch]=[];
@@ -531,7 +536,7 @@ function renderWb(){
 
 function practiceWb(){const items=Object.values(getWb()).filter(w=>!w.mastered);if(items.length)startDict(null,items.map(wbWord));else notify('没有待复习的错题。');}
 
-function practiceChapWb(chap){const items=Object.values(getWb()).filter(w=>w.chap===chap&&!w.mastered);if(items.length)startDict(chap,items.map(wbWord));}
+function practiceChapWb(chap){const items=chapterWrongWords(chap);if(items.length)startDict(chap,items.map(wbWord));}
 
 // ── SESSION DETAIL MODAL ──
 let modalSession=null, modalChap=null, modalViewMode='wrong';
@@ -543,7 +548,7 @@ function openSessionDetail(chap,n){
   modalSession=s; modalChap=chap; modalViewMode='wrong';
 
   const d=new Date(s.date);
-  qs('#modal-title').textContent=`章节 ${chap} · 第 ${s.n} 次听写`;
+  qs('#modal-title').textContent=`${chapterLabel(chap)} · 第 ${s.n} 次听写`;
   qs('#modal-meta').textContent=fmtDateFull(d);
 
   const cls=s.pct>=80?'g':s.pct>=50?'y':'r';
@@ -626,10 +631,10 @@ function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':
 function notify(message){alert(message);}
 function getStore(){
   const state=getLS('wl4_state');
-  if(state.version===4&&state.hist&&state.wb)return state;
+  if(state.version===4&&state.hist&&state.wb)return {...state,customChapters:isRecord(state.customChapters)?state.customChapters:{}};
   const wb={};
   Object.values(getLS('wl3_wb')).forEach(w=>{if(!w||typeof w.word!=='string')return;wb[wordKey(w)]={...w,mastered:false};});
-  return {version:4,hist:getLS('wl3_hist'),wb};
+  return {version:4,hist:getLS('wl3_hist'),wb,customChapters:{}};
 }
 function wbWord(w){return {w:w.word,p:w.phon||'',m:w.mean||'',chap:w.chap,answers:w.answers||[],kind:w.kind||'',speech:w.speech||''};}
 function retryPractice(){startDict(curChap,wbMode?lastPractice:null);}
@@ -705,16 +710,136 @@ function exportWb(){exportRows(Object.values(getWb()).filter(w=>qs('#wb-mastered
 function exportSessionWrong(){exportRows((window.lastWrong||[]).map(w=>({word:w.w,chap:w.chap,mean:w.m,phon:w.p,typed:w.typed,n:1,d:new Date().toISOString()})),'本次错题');}
 function exportBackup(){download('王陆听写备份-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(getStore(),null,2),'application/json');}
 function toImport(){
-  showScreen('import');activateTab('import');const state=getStore();
-  qs('#current-data-info').textContent=`${Object.values(state.hist).reduce((n,a)=>n+a.length,0)} 次练习 · ${Object.keys(state.wb).length} 条错题。记录保存在当前浏览器，建议定期导出备份。`;
+  showScreen('import');activateTab('import');refreshCsvTargets();const state=getStore();
+  qs('#current-data-info').textContent=`${Object.values(state.hist).reduce((n,a)=>n+a.length,0)} 次练习 · ${Object.keys(state.wb).length} 条错题 · ${Object.keys(state.customChapters).length} 个自定义章节。记录保存在当前浏览器，建议定期导出备份。`;
+}
+// Custom collections reference original chapter IDs so review results share wrongbook mastery.
+function isRecord(value){return !!value&&typeof value==='object'&&!Array.isArray(value);}
+function isCustomId(id){return /^custom-[a-z0-9-]+$/.test(id);}
+function restoreCorpusWord(word){
+  const original=CORPUS?.chapters.find(c=>c.id===word.chap)?.words.find(w=>norm(w.w)===norm(word.w));
+  return original?{...word,answers:original.answers||[],kind:original.kind||'',speech:original.speech||''}:word;
+}
+function syncCustomChapters(){
+  VOCAB={};CHAPTERS={};
+  (CORPUS?.chapters||[]).forEach(c=>{CHAPTERS[c.id]=c;VOCAB[c.id]=c.words;});
+  for(const [id,chapter] of Object.entries(getStore().customChapters)){
+    if(!isCustomId(id)||!chapter||typeof chapter.name!=='string'||!Array.isArray(chapter.words))continue;
+    CHAPTERS[id]={id,title:chapter.name,custom:true,audio:[],notes:'CSV 错题复习 · 逐词朗读'};
+    VOCAB[id]=chapter.words.map(restoreCorpusWord);
+  }
+}
+function refreshCsvTargets(selected=qs('#csv-target')?.value||''){
+  const target=qs('#csv-target');if(!target)return;
+  target.replaceChildren(new Option('新建复习章节',''));
+  for(const [id,chapter] of Object.entries(getStore().customChapters)){
+    if(isCustomId(id))target.add(new Option(`${chapter.name}（${chapter.words.length} 词）`,id));
+  }
+  target.value=[...target.options].some(o=>o.value===selected)?selected:'';
+  qs('#csv-name-field').hidden=!!target.value;
+}
+function parseCsv(text){
+  if(typeof text!=='string')throw Error('无法读取 CSV 文本。');
+  text=text.replace(/^\uFEFF/,'');
+  const rows=[];let row=[],cell='',mode='start';
+  const endCell=()=>{row.push(cell);cell='';mode='start';};
+  const endRow=()=>{endCell();if(row.some(v=>v.trim()))rows.push(row);row=[];};
+  for(let i=0;i<text.length;i++){
+    const char=text[i];
+    if(mode==='quoted'){
+      if(char==='"'){if(text[i+1]==='"'){cell+='"';i++;}else mode='closed';}
+      else cell+=char;
+    }else if(char===',')endCell();
+    else if(char==='\r'||char==='\n'){endRow();if(char==='\r'&&text[i+1]==='\n')i++;}
+    else if(char==='"'&&mode==='start')mode='quoted';
+    else {
+      if(mode==='closed'||char==='"')throw Error(`第 ${rows.length+1} 条 CSV 记录的引号格式无效。`);
+      cell+=char;mode='plain';
+    }
+  }
+  if(mode==='quoted')throw Error('CSV 中有未闭合的引号。');
+  endRow();return rows;
+}
+// csvCell prefixes spreadsheet formulas with an apostrophe; undo only that prefix.
+function decodeCsvCell(value){return /^'[\s]*[=+\-@]/.test(value)?value.slice(1):value;}
+function wrongCsvWords(text){
+  const rows=parseCsv(text),headers=['章节','正确答案','我的答案','释义','音标','错误次数','最近练习','状态'];
+  const header=rows.shift()?.map(v=>v.trim());
+  if(!header||header.length!==headers.length||new Set(header).size!==headers.length||headers.some(h=>!header.includes(h)))throw Error('CSV 表头应包含：'+headers.join('、')+'。');
+  if(!rows.length)throw Error('CSV 中没有错题。');
+  return rows.map((row,index)=>{
+    const fail=message=>{throw Error(`第 ${index+2} 条 CSV 记录：${message}`);};
+    if(row.length!==headers.length)fail('列数应为 8 列。');
+    const [chap,w,typed,m,p,count,date,status]=headers.map(h=>decodeCsvCell(row[header.indexOf(h)]));
+    if(!chap.trim()||!w.trim())fail('章节和正确答案不能为空。');
+    if(!/^\d+$/.test(count.trim())||!Number.isSafeInteger(Number(count))||Number(count)<1)fail('错误次数必须为正整数。');
+    if(!date.trim()||!Number.isFinite(Date.parse(date)))fail('最近练习日期无效。');
+    if(!['已掌握','待复习'].includes(status.trim()))fail('状态应为“已掌握”或“待复习”。');
+    return restoreCorpusWord({chap:chap.trim(),w,p,m,typed,n:Number(count),d:date,mastered:status.trim()==='已掌握'});
+  });
+}
+function mergeChapterWords(existing,incoming){
+  const words=existing.map(w=>({...w})),keys=new Set(words.map(wordKey));
+  incoming.forEach(w=>{const key=wordKey(w);if(!keys.has(key)){keys.add(key);words.push(w);}});
+  return words;
+}
+let csvImportBusy=false;
+async function importWrongCsv(){
+  if(csvImportBusy)return;
+  const result=qs('#csv-result'),file=qs('#csv-file').files[0],targetId=qs('#csv-target').value;
+  const name=qs('#csv-name').value.trim()||file?.name.replace(/\.csv$/i,'').trim()||'错题复习';
+  result.replaceChildren();result.style.color='var(--rb)';
+  if(!file){result.textContent='请先选择错题 CSV 文件。';return;}
+  csvImportBusy=true;qs('#csv-import-btn').disabled=true;
+  try{
+    const words=wrongCsvWords(await file.text()),state=getStore();
+    if(targetId&&!state.customChapters[targetId])throw Error('目标章节已不存在，请重新选择。');
+    const id=targetId||'custom-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+    const chapter=state.customChapters[id]||{id,name,createdAt:new Date().toISOString(),words:[]};
+    const merged=mergeChapterWords(chapter.words,words),added=merged.length-chapter.words.length;
+    state.customChapters[id]={...chapter,words:merged};
+    words.forEach(w=>{
+      const key=wordKey(w);
+      if(!Object.hasOwn(state.wb,key))state.wb[key]={word:w.w,phon:w.p,mean:w.m,chap:w.chap,typed:w.typed,n:w.n,d:w.d,mastered:w.mastered,answers:w.answers||[],kind:w.kind||'',speech:w.speech||''};
+    });
+    if(!setLS('wl4_state',state)){result.textContent='导入未保存，请检查浏览器存储空间后重试。';return;}
+    syncCustomChapters();toImport();refreshCsvTargets(id);
+    result.style.color='var(--gb)';result.textContent=`已导入“${chapter.name}”：新增 ${added} 词，跳过 ${words.length-added} 条重复记录，共 ${merged.length} 词。 `;
+    const start=document.createElement('button');start.className='btn btn-primary btn-sm';start.textContent='开始听写';start.onclick=()=>startDict(id);result.append(start);
+  }catch(e){result.textContent='导入失败：'+e.message;}
+  finally{csvImportBusy=false;qs('#csv-import-btn').disabled=false;}
+}
+function validateCustomChapters(incoming){
+  if(incoming===undefined)return {};
+  if(!isRecord(incoming))throw Error('自定义章节格式无效。');
+  const chapters={};
+  for(const [id,chapter] of Object.entries(incoming)){
+    if(!isCustomId(id)||!isRecord(chapter)||typeof chapter.name!=='string'||!chapter.name.trim()||!Array.isArray(chapter.words)||!chapter.words.length)throw Error('自定义章节格式无效。');
+    const words=chapter.words.map(w=>{
+      if(!isRecord(w)||typeof w.w!=='string'||!w.w.trim()||typeof w.chap!=='string'||!w.chap.trim())throw Error('自定义章节词条格式无效。');
+      for(const field of ['p','m','typed','d','kind','speech'])if(w[field]!==undefined&&typeof w[field]!=='string')throw Error('自定义章节词条格式无效。');
+      if(w.answers!==undefined&&(!Array.isArray(w.answers)||w.answers.some(a=>typeof a!=='string')))throw Error('自定义章节答案格式无效。');
+      if(w.n!==undefined&&(!Number.isSafeInteger(w.n)||w.n<1))throw Error('自定义章节错误次数无效。');
+      if(w.d!==undefined&&!Number.isFinite(Date.parse(w.d)))throw Error('自定义章节日期无效。');
+      if(w.mastered!==undefined&&typeof w.mastered!=='boolean')throw Error('自定义章节掌握状态无效。');
+      return restoreCorpusWord({...w});
+    });
+    chapters[id]={...chapter,id,words:mergeChapterWords([],words)};
+  }
+  return chapters;
 }
 function doImport(){
   const result=qs('#import-result');
   try{
-    const incoming=JSON.parse(qs('#import-input').value);if(!incoming||!incoming.hist||!incoming.wb)throw Error('需要包含 hist 和 wb 的 JSON 备份。');
+    const incoming=JSON.parse(qs('#import-input').value);if(!isRecord(incoming)||!isRecord(incoming.hist)||!isRecord(incoming.wb))throw Error('需要包含 hist 和 wb 的 JSON 备份。');
+    const customChapters=validateCustomChapters(incoming.customChapters);
     const state=getStore();let count=0;
+    for(const [id,chapter] of Object.entries(customChapters)){
+      const previous=state.customChapters[id];
+      state.customChapters[id]=previous?{...previous,words:mergeChapterWords(previous.words,chapter.words)}:chapter;
+    }
     for(const [chap,sessions] of Object.entries(incoming.hist)){
-      if(!Array.isArray(sessions)||!(/^[0-9]+\.[0-9]+(?:-[a-z0-9]+)?$/.test(chap)||chap==='__wb__'))throw Error('章节记录格式无效。');
+      if(!Array.isArray(sessions)||!(/^[0-9]+\.[0-9]+(?:-[a-z0-9]+)?$/.test(chap)||chap==='__wb__'||isCustomId(chap)&&Object.hasOwn(state.customChapters,chap)))throw Error('章节记录格式无效。');
       if(!state.hist[chap])state.hist[chap]=[];
       for(const session of sessions){
         if(!session||!Number.isFinite(session.pct)||!Number.isFinite(session.total)||!Number.isFinite(session.correct)||!Number.isFinite(Date.parse(session.date)))throw Error('听写记录格式无效。');
@@ -725,23 +850,23 @@ function doImport(){
     }
     for(const w of Object.values(incoming.wb)){
       if(!w||typeof w.word!=='string'||!Number.isFinite(w.n))throw Error('错题格式无效。');
-      if(w.chap&&!/^[0-9]+\.[0-9]+(?:-[a-z0-9]+)?$/.test(w.chap))throw Error('错题章节格式无效。');
+      if(w.chap!==undefined&&typeof w.chap!=='string')throw Error('错题章节格式无效。');
       const key=wordKey(w),old=state.wb[key];if(!old||w.n>old.n)state.wb[key]={...w,mastered:!!w.mastered};
     }
-    if(!setLS('wl4_state',state))return;result.style.color='var(--gb)';result.textContent=`已合并 ${count} 条新记录；重复导入不会重复累计。`;toImport();
+    if(!setLS('wl4_state',state))return;syncCustomChapters();result.style.color='var(--gb)';result.textContent=`已合并 ${count} 条新记录、${Object.keys(customChapters).length} 个自定义章节；重复导入不会重复累计。`;toImport();
   }catch(e){result.style.color='var(--rb)';result.textContent='导入失败：'+e.message;}
 }
 function clearAllData(){
-  if(!confirm('确定清空所有听写记录、错题和草稿？请先导出备份。'))return;
-  if(!setLS('wl4_state',{version:4,hist:{},wb:{}}))return;
-  localStorage.removeItem('wl4_draft');toImport();
+  if(!confirm('确定清空所有听写记录、错题、自定义章节和草稿？请先导出备份。'))return;
+  if(!setLS('wl4_state',{version:4,hist:{},wb:{},customChapters:{}}))return;
+  localStorage.removeItem('wl4_draft');syncCustomChapters();qs('#csv-result').replaceChildren();toImport();
 }
 async function init(){
   try{
     const [corpus,audio]=await Promise.all(['data/corpus.json','data/audio.json'].map(async path=>{const r=await fetch(path);if(!r.ok)throw Error(path+' 加载失败');return r.json();}));
     if(corpus.schemaVersion!==1||!Array.isArray(corpus.chapters)||!Array.isArray(audio.tracks))throw Error('词库格式不正确');
     CORPUS=corpus;AUDIO=audio.tracks;
-    corpus.chapters.forEach(c=>{CHAPTERS[c.id]=c;VOCAB[c.id]=c.words;});renderHome();
+    syncCustomChapters();renderHome();
 
   }catch(e){qs('.home-hero p').textContent='词库未加载';qs('#home-status').textContent=location.protocol==='file:'?'请通过本地服务器打开：在项目目录运行 python3 -m http.server 8000，再访问 http://localhost:8000。':'加载失败，请刷新重试。'+e.message;}
 }

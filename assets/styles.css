@@ -221,6 +221,16 @@ audio{height:32px;flex:1;min-width:180px;color-scheme:dark;}
 .card-title{font-size:11px;color:var(--dim);margin-top:6px;min-height:30px;}
 .wb-word,.wr-correct,.wr-typed,.mw-typed{overflow-wrap:anywhere;}
 #home-status{font-size:12px;color:var(--yellow);line-height:1.8;}
+.csv-import-panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;}
+.csv-import-panel h2{font-size:15px;margin-bottom:8px;}
+.csv-import-panel label{display:block;font-size:12px;color:var(--dim);margin:12px 0 6px;}
+.csv-import-panel input,.csv-import-panel select{width:100%;min-width:0;}
+.csv-import-panel input{font:12px var(--sans);color:var(--text);}
+.csv-import-panel input[type="text"]{background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px;}
+.csv-import-panel p{margin-bottom:12px;}
+#csv-name-field{margin-bottom:12px;}
+#csv-result{font-size:12px;line-height:1.8;margin-top:10px;overflow-wrap:anywhere;}
+#csv-result .btn{margin-left:8px;}
 @media(max-width:600px){
  .topbar{gap:3px;padding:0 10px;}.topbar-logo{font-size:10px;letter-spacing:1px;}.tab{padding:4px 7px;}
  .dict-strip{padding:8px 10px;gap:6px;height:auto;flex-wrap:wrap;}.dict-meta{font-size:10px;}
